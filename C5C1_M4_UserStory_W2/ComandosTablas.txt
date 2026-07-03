@@ -1,0 +1,232 @@
+CREATE TABLE estudiantes (
+id_estudiante INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+nombre_completo VARCHAR(200) NOT NULL,
+correo_electronico VARCHAR(200) NOT NULL UNIQUE,
+identificacion VARCHAR(20) NOT NULL UNIQUE,
+carrera VARCHAR(100) NOT NULL,
+fecha_nacimiento DATE NOT NULL,
+fecha_ingreso DATE NOT NULL,
+created_at TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP,
+updated_at TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP	
+);
+
+CREATE TABLE docentes (
+id_docente INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+nombre_completo VARCHAR(200) NOT NULL,
+correo_institucional VARCHAR(200) NOT NULL UNIQUE,
+departamento_academico VARCHAR(50) NOT NULL,
+anios_experiencia SMALLINT NOT NULL CHECK (anios_experiencia >= 0),
+created_at TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP,
+updated_at TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE cursos (
+id_curso INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+nombre VARCHAR(200) NOT NULL,
+codigo VARCHAR(20) NOT NULL UNIQUE,
+creditos SMALLINT CHECK (creditos > 0),
+semestre SMALLINT CHECK (semestre BETWEEN 1 AND 10),
+id_docente INT, 
+FOREIGN KEY (id_docente) REFERENCES docentes(id_docente)
+        ON DELETE SET NULL
+        ON UPDATE CASCADE,
+created_at TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP,
+updated_at TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE inscripciones (
+id_inscripcion INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+id_estudiante INT NOT NULL,
+id_curso INT NOT NULL,
+fecha_inscripcion DATE NOT NULL,
+calificacion_final DECIMAL(4,2) CHECK (calificacion_final BETWEEN 0.0 AND 5.0),
+FOREIGN KEY (id_estudiante) REFERENCES estudiantes(id_estudiante)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE,
+FOREIGN KEY (id_curso) REFERENCES cursos(id_curso)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE,
+created_at TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP,
+updated_at TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO docentes (nombre_completo, correo_institucional, departamento_academico, anios_experiencia)
+VALUES 
+('Carlos Mendoza Ríos', 'c.mendoza@universidad.edu.co', 'Ingeniería de Sistemas', 12),
+('Laura Gómez Herrera', 'l.gomez@universidad.edu.co', 'Ciencias Básicas', 8),
+('Andrés Vargas Pinto', 'a.vargas@universidad.edu.co', 'Administración', 15);
+
+INSERT INTO estudiantes (nombre_completo, correo_electronico, identificacion, carrera, fecha_nacimiento, fecha_ingreso)
+VALUES
+('Sofía Torres Mejía', 's.torres@estudiantil.edu.co', '1005234781', 'Ingeniería de Sistemas', '2001-03-14', '2020-01-20'),
+('Mateo Ramírez Cruz', 'm.ramirez@estudiantil.edu.co', '1006789234', 'Administración de Empresas', '2000-07-22', '2019-07-15'),
+('Valentina Moreno Gil', 'v.moreno@estudiantil.edu.co', '1007345612', 'Ingeniería de Sistemas', '2002-11-05', '2021-01-18'),
+('Juan Pablo Ossa', 'jp.ossa@estudiantil.edu.co', '1003456789', 'Contaduría Pública', '1999-05-30', '2018-07-10'),
+('Daniela Restrepo Vega', 'd.restrepo@estudiantil.edu.co', '1008123456', 'Administración de Empresas', '2003-01-17', '2022-01-24');
+
+INSERT INTO cursos (nombre, codigo, creditos, semestre, id_docente)
+VALUES
+('Fundamentos de Programación', 'ISI-101', 3, 1, 1),
+('Cálculo Diferencial', 'MAT-101', 4, 1, 2),
+('Gestión Empresarial', 'ADM-201', 3, 2, 3),
+('Base de Datos I', 'ISI-301', 4, 3, 1);
+
+INSERT INTO inscripciones (id_estudiante, id_curso, fecha_inscripcion, calificacion_final)
+VALUES
+(1, 1, '2020-02-01', 4.5),
+(1, 2, '2020-02-01', 3.8),
+(2, 3, '2019-08-05', 4.1),
+(3, 1, '2021-02-03', 3.5),
+(3, 4, '2021-02-03', 4.8),
+(4, 2, '2018-08-01', 2.9),
+(4, 3, '2018-08-01', 3.7),
+(2, 1, '2024-02-10', 4.3),
+(5, 4, '2022-02-07', 4.2);
+
+--TASK 3
+--Listar todos los estudiantes con sus inscripciones y cursos (JOIN).
+SELECT 
+	e.nombre_completo as nombre_estudiante,
+	c.codigo,
+	c.nombre as nombre_curso,
+	i.fecha_inscripcion,
+	i.calificacion_final
+FROM public.inscripciones as i
+INNER JOIN public.estudiantes as e ON i.id_estudiante = e.id_estudiante
+INNER JOIN public.cursos as c ON i.id_curso = c.id_curso
+ORDER BY e.nombre_completo ASC
+
+--Listar cursos dictados por docentes con > 5 años de experiencia.
+SELECT 
+	c.codigo,
+	c.nombre as nombre_curso,
+	d.nombre_completo as docente_asignado,
+	d.anios_experiencia as experiencia_docente
+FROM cursos as c
+INNER JOIN docentes as d ON c.id_docente = d.id_docente
+WHERE d.anios_experiencia > 5
+ORDER BY c.nombre ASC
+
+--Obtener promedio de calificaciones por curso (GROUP BY + AVG).
+SELECT 
+	c.codigo,
+	c.nombre as nombre_curso,
+	ROUND(AVG(i.calificacion_final),2) as promedio_curso
+FROM inscripciones as i
+INNER JOIN cursos as c ON c.id_curso = i.id_curso
+GROUP BY c.codigo, c.nombre
+ORDER BY promedio_curso DESC
+
+--Mostrar estudiantes inscritos en más de un curso (HAVING COUNT(*) > 1).
+SELECT 
+	e.nombre_completo as nombre_estudiante,
+	COUNT(i.id_inscripcion) as cursos_inscritos
+FROM inscripciones as i
+INNER JOIN estudiantes as e ON i.id_estudiante = e.id_estudiante
+GROUP BY e.nombre_completo
+HAVING COUNT(i.id_inscripcion) > 1
+ORDER BY e.nombre_completo ASC
+
+--ALTER TABLE: agregar columna estado_academico a estudiantes.
+ALTER TABLE estudiantes
+ADD COLUMN estado_academico VARCHAR(20)
+CHECK (estado_academico IN ('Activo', 'Inactivo', 'Graduado', 'Suspendido'));
+
+--Eliminar un docente y observar el efecto en cursos (revisar ON DELETE en la FK).
+DELETE FROM docentes
+WHERE id_docente = 1;
+
+--Consultar cursos con más de 2 estudiantes inscritos (GROUP BY + COUNT + HAVING).
+SELECT 
+	c.codigo, 
+	c.nombre as nombre_curso,
+	COUNT(i.id_inscripcion) as estudiantes_inscritos
+FROM inscripciones as i
+INNER JOIN cursos as c ON i.id_curso = c.id_curso
+GROUP BY c.nombre, c.codigo
+HAVING COUNT(i.id_inscripcion) > 2
+ORDER BY c.nombre ASC
+
+--TASK 4
+--Estudiantes cuya calificación promedio sea > promedio general (AVG() + subconsulta).
+SELECT
+    e.nombre_completo,
+    ROUND(AVG(i.calificacion_final),2) AS promedio
+FROM estudiantes e
+INNER JOIN inscripciones i
+    ON e.id_estudiante = i.id_estudiante
+GROUP BY e.id_estudiante, e.nombre_completo
+HAVING AVG(i.calificacion_final) >
+(
+    SELECT AVG(calificacion_final)
+    FROM inscripciones
+)
+ORDER BY promedio DESC;
+
+--Nombres de carreras con estudiantes inscritos en cursos del semestre ≥ 2 (IN o EXISTS).
+SELECT DISTINCT carrera
+FROM estudiantes
+WHERE id_estudiante IN
+(
+    SELECT id_estudiante
+    FROM inscripciones i
+    INNER JOIN cursos c
+        ON c.id_curso = i.id_curso
+    WHERE c.semestre >= 2
+);
+
+--Usar ROUND, SUM, MAX, MIN, COUNT para obtener indicadores.
+SELECT
+    COUNT(*) AS total_inscripciones,
+    ROUND(AVG(calificacion_final),2) AS promedio_general,
+    MAX(calificacion_final) AS nota_maxima,
+    MIN(calificacion_final) AS nota_minima,
+    SUM(calificacion_final) AS suma_calificaciones
+FROM inscripciones;
+
+--TASK 5
+--Crea la vista vista_historial_academico que muestre: nombre del estudiante, nombre del curso, nombre del docente, semestre y calificación final.
+CREATE VIEW vista_historial_academico AS
+SELECT 
+	e.nombre_completo as nombre_estudiante,
+	c.nombre as nombre_curso,
+	d.nombre_completo as nombre_docente,
+	c.semestre,
+	i.calificacion_final
+FROM inscripciones as i
+INNER JOIN cursos as c ON c.id_curso = i.id_curso
+INNER JOIN docentes as d ON d.id_docente = c.id_docente
+INNER JOIN estudiantes as e ON e.id_estudiante = i.id_estudiante
+
+SELECT * FROM vista_historial_academico
+
+--TASK 6
+--1. Otorga permisos de solo lectura a un rol revisor_academico sobre la vista (GRANT SELECT).
+CREATE ROLE revisor_academico;
+GRANT SELECT
+ON vista_historial_academico
+TO revisor_academico;
+--puede hacer pero no editar
+SELECT * FROM vista_historial_academico;
+
+--2. Revoca permisos de modificación de datos en inscripciones para ese rol (REVOKE).
+REVOKE INSERT, UPDATE, DELETE
+ON inscripciones
+FROM revisor_academico;
+
+--3. Simula actualización de calificaciones usando BEGIN, SAVEPOINT, ROLLBACK y COMMIT.
+BEGIN;
+
+UPDATE inscripciones
+SET calificacion_final = 4.9
+WHERE id_inscripcion = 1;
+
+SAVEPOINT primera_actualizacion;
+
+UPDATE inscripciones
+SET calificacion_final = 2.0
+WHERE id_inscripcion = 2;
+
+ROLLBACK TO SAVEPOINT primera_actualizacion;
+
+COMMIT;
